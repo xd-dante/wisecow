@@ -1,10 +1,9 @@
-FROM ubuntu:latest
+## As this is interview so i didnt check multiple image but ideally prefered alpine unless we required some debian library 
+FROM ubuntu:latest        
 
 RUN apt-get update && apt-get install -y \ 
     fortune-mod \
     cowsay \
-    iputils-ping \
-    netcat \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="$PATH:/usr/games"
