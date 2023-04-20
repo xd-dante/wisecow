@@ -1,0 +1,70 @@
+name: Wisecow Production 
+
+on:
+  push:
+    branches:                ## currently take example of push on branch but we can set trigger on pull request or on different github event types
+      - main
+  workflow_dispatch:         ## This is optional incase we want to trigger the workflow without pushing main for redeploy else we can ignore this its not required
+    branches:
+      - main
+
+jobs:
+  lint: 
+    name: Linter
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    #####################################################
+    ## Some Test Cases for node python or atleast lint ##
+    #####################################################
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}                             ## This can be pull request as while devloper raising PR we will build and see weather it has any error or not
+    needs:
+      - lint
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      id: configure-aws-credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}             ## add AWS_ACCESS_KEY_ID under github repository secret
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}     ## add AWS_SECRET_ACCESS_KEY under github repository secret
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-docker-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: wisecow                                         ## Update ECR repository name here i take ECR example but we can push any docker registry that we choose
+        IMAGE_TAG: ${{ github.sha }}
+        BASE_IMAGE_TAG: latest
+      run: |
+        # Build a docker container and
+        # push it to ECR 
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$BASE_IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push -a $ECR_REGISTRY/$ECR_REPOSITORY
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  deploy: 
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    needs:
+      - lint
+      - build
+    steps:
+    - uses: actions/checkout@v3
+
+    #####################################################
+    ## Deploy steps like where to deploy this image    ##
+    #####################################################
